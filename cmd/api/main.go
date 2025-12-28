@@ -1,15 +1,17 @@
+// cmd/api/main.go
 package main
 
 import (
-	"context"
-	"log"
-	"net/http"
-	"os"
-	"time"
+    "context"
+    "log"
+    "net/http"
+    "os"
+    "time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+    "github.com/jackc/pgx/v5/pgxpool"
 
-	httpapi "github.com/ogradyo/lotto-app/internal/http"
+    "github.com/ogradyo/lotto-app/web"
+    "github.com/ogradyo/lotto-app/internal/httpapi"
 )
 
 func main() {
@@ -21,19 +23,23 @@ func main() {
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		log.Fatalf("failed to connect to Postgres: %v", err)
+		log.Fatalf("error creating db pool: %v", err)
 	}
 	defer db.Close()
 
+	tmpls := web.Templates
+	//tmpls := template.Must(template.ParseFS(templateFS, "web/templates/*.html")) // key change
+
+    server := httpapi.NewServer(db, tmpls)
+
 	srv := &http.Server{
-		Addr:         ":8080",
-		Handler:      httpapi.NewServer(db).Router(),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr:              ":8080",
+		Handler:           server.Router(),
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	log.Println("listening on :8080")
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server error: %v", err)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatal(err)
 	}
 }
