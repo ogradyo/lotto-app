@@ -10,6 +10,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ogradyo/lotto-app/internal/tickets"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"github.com/google/uuid"
+
 )
 
 // Server struct
@@ -36,6 +42,9 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /api/tickets", s.handleCreateTicketJSON)
 	mux.HandleFunc("GET /tickets/new", s.handleShowAddTicketForm)
 	mux.HandleFunc("POST /tickets", s.handleCreateTicketForm)
+	
+	// New: photo upload endpoint
+	mux.HandleFunc("POST /api/tickets/photo", s.uploadTicketPhotoHandler)
 
 	return mux
 }
@@ -151,4 +160,77 @@ func (s *Server) renderAddTicketForm(w http.ResponseWriter, data any) {
 		log.Printf("execute template add_ticket.html: %v", err)
 		http.Error(w, "template error", http.StatusInternalServerError)
 	}
+}
+func (s *Server) uploadTicketPhotoHandler(w http.ResponseWriter, r *http.Request) {
+    const maxUploadSize = 10 << 20 // 10 MB
+
+    r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+
+    if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+        http.Error(w, "file too large or invalid form", http.StatusBadRequest)
+        return
+    }
+
+    game := r.FormValue("game")
+    if game == "" {
+        http.Error(w, "game is required", http.StatusBadRequest)
+        return
+    }
+
+	// didn't use header so removed it
+    // file, header, err := r.FormFile("ticket")
+    file, _, err := r.FormFile("ticket")
+    if err != nil {
+        http.Error(w, "ticket file is required", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+
+    // Basic content-type check
+    buf := make([]byte, 512)
+    n, _ := file.Read(buf)
+    contentType := http.DetectContentType(buf[:n])
+    if contentType != "image/jpeg" && contentType != "image/png" {
+        http.Error(w, "only JPEG/PNG allowed", http.StatusBadRequest)
+        return
+    }
+    if _, err := file.Seek(0, io.SeekStart); err != nil {
+        http.Error(w, "failed to read file", http.StatusInternalServerError)
+        return
+    }
+
+    // Generate ID and save to disk, e.g. var/ticket-photos/<id>.jpg
+    id := uuid.New().String()
+    ext := ".jpg" // or derive from contentType/header.Filename
+    dir := "var/ticket-photos"
+    if err := os.MkdirAll(dir, 0o755); err != nil {
+        http.Error(w, "storage error", http.StatusInternalServerError)
+        return
+    }
+
+    dstPath := filepath.Join(dir, id+ext)
+    dst, err := os.Create(dstPath)
+    if err != nil {
+        http.Error(w, "storage error", http.StatusInternalServerError)
+        return
+    }
+    defer dst.Close()
+
+    if _, err := io.Copy(dst, file); err != nil {
+        http.Error(w, "failed to save file", http.StatusInternalServerError)
+        return
+    }
+
+    // Insert DB row: ticket_photos(id, game, path, uploaded_at, status)
+    // status could start as "pending_ocr"
+
+// TODO: persist ticket photo metadata in DB
+//	if err := s.store.InsertTicketPhoto(r.Context(), id, game, dstPath); err != nil {
+//        http.Error(w, "db error", http.StatusInternalServerError)
+//        return
+//    }
+
+    w.WriteHeader(http.StatusCreated)
+    w.Header().Set("Content-Type", "application/json")
+    fmt.Fprintf(w, `{"id": %q, "game": %q, "status": "pending_ocr"}`, id, game)
 }

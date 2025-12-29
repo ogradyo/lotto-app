@@ -101,6 +101,11 @@
 
     <button type="submit">Add Ticket</button>
   </form>
+  <form action="/api/tickets/photo" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="game" value="powerball">
+    <input type="file" name="ticket" accept="image/*" capture="environment">
+    <button type="submit">Upload Powerball Ticket</button>
+  </form>
 </div>
 </body>
 </html>
