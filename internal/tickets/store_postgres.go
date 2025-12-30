@@ -54,3 +54,51 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (*Ticket, error) {
 	}
 	return &t, nil
 }
+
+func (s *Store) List(ctx context.Context, userID int64) ([]Ticket, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT
+			id,
+			user_id,
+			game,
+			draw_date,
+			white1, white2, white3, white4, white5,
+			special,
+			multiplier,
+			image_url,
+			created_at
+		FROM tickets
+		WHERE user_id = $1
+		ORDER BY draw_date DESC, id DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ts []Ticket
+	for rows.Next() {
+		var t Ticket
+		var w1, w2, w3, w4, w5 int
+		if err := rows.Scan(
+			&t.ID,
+			&t.UserID,
+			&t.Game,
+			&t.DrawDate,
+			&w1, &w2, &w3, &w4, &w5,
+			&t.Special,
+			&t.Multiplier,
+			&t.ImageURL,
+			&t.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		t.White = [5]int{w1, w2, w3, w4, w5}
+		ts = append(ts, t)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return ts, nil
+}
+

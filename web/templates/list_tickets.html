@@ -1,0 +1,35 @@
+{{define "list_tickets.html"}}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Your Tickets</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1rem; }
+    .ticket { border: 1px solid #ccc; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .game { font-weight: bold; }
+    .numbers { margin-top: 0.25rem; }
+    a.button { display: inline-block; padding: 0.75rem 1rem; margin-bottom: 1rem; background: #0066ff; color: #fff; text-decoration: none; border-radius: 8px; text-align: center; }
+  </style>
+</head>
+<body>
+  <a href="/tickets/new" class="button">Add Ticket</a>
+
+  {{if .Tickets}}
+    {{range .Tickets}}
+      <div class="ticket">
+        <div class="game">{{.Game}} — {{.DrawDate.Format "2006-01-02"}}</div>
+        <div class="numbers">
+          White: {{index .White 0}}, {{index .White 1}}, {{index .White 2}}, {{index .White 3}}, {{index .White 4}}
+          &nbsp; | &nbsp;
+          Special: {{.Special}}
+        </div>
+      </div>
+    {{end}}
+  {{else}}
+    <p>No tickets yet. Add your first one above.</p>
+  {{end}}
+</body>
+</html>
+{{end}}

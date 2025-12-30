@@ -42,6 +42,9 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /api/tickets", s.handleCreateTicketJSON)
 	mux.HandleFunc("GET /tickets/new", s.handleShowAddTicketForm)
 	mux.HandleFunc("POST /tickets", s.handleCreateTicketForm)
+	// in Router()
+	mux.HandleFunc("GET /tickets", s.handleListTickets)
+
 	
 	// New: photo upload endpoint
 	mux.HandleFunc("POST /api/tickets/photo", s.uploadTicketPhotoHandler)
@@ -233,4 +236,26 @@ func (s *Server) uploadTicketPhotoHandler(w http.ResponseWriter, r *http.Request
     w.WriteHeader(http.StatusCreated)
     w.Header().Set("Content-Type", "application/json")
     fmt.Fprintf(w, `{"id": %q, "game": %q, "status": "pending_ocr"}`, id, game)
+}
+
+func (s *Server) handleListTickets(w http.ResponseWriter, r *http.Request) {
+	// later: real auth; for now, same hard-coded user
+	const userID = int64(1)
+
+	ts, err := s.tickets.List(r.Context(), userID)
+	if err != nil {
+		log.Printf("list tickets: %v", err)
+		http.Error(w, "could not list tickets", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]any{
+		"Tickets": ts,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "list_tickets.html", data); err != nil {
+		log.Printf("execute template list_tickets.html: %v", err)
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
 }

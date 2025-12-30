@@ -1,2 +1,5 @@
 lotto-app
 var/
+.DS_Store
+.venv/
+debug_rois.png
